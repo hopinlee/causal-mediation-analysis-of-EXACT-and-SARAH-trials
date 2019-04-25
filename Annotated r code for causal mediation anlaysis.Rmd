@@ -1,0 +1,130 @@
+---
+title: "Annotated code for causal mediation analysis"
+author: "Hopin Lee"
+date: "25/04/2019"
+output: html_document
+---
+
+```{r}
+#Load packages
+library("mediation")
+library("tidyverse")
+
+#Load data
+EXACT_data <- read.dta("...")
+SARAH_data <- read.dta("...")
+```
+
+
+## ...............................EXACT TRIAL.................................
+Rehab + advice vs Advice --> Physical Activity (low vs mod-high) --> Function (Lower Extremity Functional Scale - 0-80)
+
+Fit Mediator Model
+```{r}
+med.fit.exact <- glm(pa_level1 ~ group + pa_level0, family=binomial(link='probit'), data = EXACT_data)
+
+summary(med.fit.exact)
+confint(med.fit.exact)
+
+#Exponentiate for OR
+exp(cbind(OR = coef(med.fit.exact), confint(med.fit.exact)))
+```
+
+Fit Outcome Model (with confounders and interaction term)
+```{r}
+out.fit.exact <- lm(lefs3 ~ pa_level1*group + immob_dur0 + pain_wb0 + pain_stairs0 + pa_level0, data = EXACT_data)
+
+summary(out.fit.exact)
+confint(out.fit.exact)
+```
+
+Combine models and summarise + plot
+```{r}
+med.out.exact <- mediate(med.fit.exact, out.fit.exact, 
+                         treat = "group", 
+                         mediator = "pa_level1", 
+                         robustSE = TRUE, sims = 1000, dropobs = TRUE) 
+
+summary(med.out.exact)
+
+par(oma=c(3, 3, 3, 3))
+plot(med.out.exact, treatment = NULL, 
+     labels = c("ACME","ADE","TE"), 
+     effect.type = c("indirect","direct","total"), 
+     xlim = range(-10:10), ylim = NULL, xlab = "", main = NULL, lwd = 3, cex = 2, 
+     col = "maroon", cex.axis=2, cex.lab=2, cex.main=2)
+mtext("Lower extremity function (LEFS)", side=1, line=3, cex = 2)
+
+```
+
+Sensitivity Analysis
+```{r, echo=FALSE}
+sens.out.exact <- medsens(med.out.exact, rho.by = 0.1, effect.type = "indirect", sims = 1000)
+
+summary(sens.out.exact)
+
+sens1.exact <-plot(sens.out.exact, sens.par = c("rho", "R2"),  
+                   r.type = c("residual", "total"), 
+                   sign.prod = c("positive", "negative"), 
+                   pr.plot = FALSE, smooth.effect = FALSE, smooth.ci = FALSE, levels = NULL, 
+                   xlab = "", ylab = "", xlim = NULL, ylim = range(-10:10),  
+                   main = "", lwd = par("lwd"), cex.axis=2, cex.lab=2, cex.main=2)
+mtext("ACME", side=2, line=3.5, cex=2)
+mtext("Sensitivity Parameter", side=1, line=3.5, cex = 2)
+
+
+```
+
+
+
+## ...............................SARAH TRIAL.................................
+SARAH Exercise vs Usual care --> Grip Strength@4m (newtons) --> Function@12m (MHQ - function scale - 0-100)
+
+Fit Mediator Model
+```{r}
+med.fit.sarah <- lm(rfm_gripoverall ~ group + bsl_gripoverall, data = SARAH_data)
+
+summary(med.fit.sarah)
+```
+
+Fit Outcome Model (with confounders and interaction term)
+```{r}
+out.fit.sarah <- lm(ptm_mhq_function ~ rfm_gripoverall*group + age + pat_PatientSex + bsl_mhq_function + bsl_gripoverall + dmardcombined + steroid, data = SARAH_data)
+
+summary(out.fit.sarah)
+```
+
+Combine models and summarise + plot
+```{r}
+med.out.sarah <- mediate(med.fit.sarah, out.fit.sarah, 
+                         treat = "group", 
+                         mediator = "rfm_gripoverall", 
+                         robustSE = TRUE, sims = 1000, dropobs = TRUE) 
+
+summary(med.out.sarah)
+
+par(oma=c(3, 3, 3, 3))
+plot(med.out.sarah, treatment = NULL, labels = c("ACME","ADE","TE"), 
+     effect.type = c("indirect","direct","total"), xlim = range(-1:10), ylim = NULL, 
+     xlab = "", main = NULL, lwd = 3, cex = 2, 
+     col = "maroon", cex.axis=2, cex.lab=2, cex.main=2)
+mtext("Hand function (MHQ)", side=1, line=3, cex = 2)
+```
+
+Sensitivity Analysis
+```{r, echo=FALSE}
+sens.out.sarah <- medsens(med.out.sarah, rho.by = 0.1, effect.type = "indirect", sims = 1000)
+
+summary(sens.out.sarah)
+
+sens2.sarah <- plot(sens.out.sarah, sens.par = c("rho", "R2"),  
+                    r.type = c("residual", "total"), sign.prod = c("positive", "negative"), 
+                    pr.plot = FALSE, smooth.effect = FALSE, smooth.ci = FALSE, levels = NULL,  
+                    xlab = "", ylab = "", xlim = NULL, ylim = range(-10:10),  
+                    main = "", lwd = par("lwd"), cex.axis=2, cex.lab=2, cex.main=2)
+
+mtext("ACME", side=2, line=3.5, cex=2)
+mtext("Sensitivity Parameter", side=1, line=3.5, cex = 2)
+```
+
+---END---
